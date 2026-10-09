@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "revia-api"
+version = "0.1.0"
+description = "API FastAPI de RevIA : génération de QCM de révision via Gemini"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic-settings",
+  "python-multipart",   # upload PDF multipart
+  "google-genai",       # appel à Gemini (utilisé à partir de la Phase 1)
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "httpx",              # requis par TestClient de FastAPI
+  "ruff",
+]
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
