@@ -26,3 +26,7 @@ class QuotaExceededError(ApiError):
 class GenerationFailedError(ApiError):
     status_code = 502
     code = "generation_failed"
+
+class InvalidPdfError(ApiError):
+    status_code = 400
+    code = "invalid_pdf"
