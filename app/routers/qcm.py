@@ -1,4 +1,3 @@
-# qcm.py - RevIA API
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
@@ -8,6 +7,7 @@ from app.config import settings
 from app.errors import InvalidPdfError, PdfTooLargeError
 from app.providers.base import QCMProvider
 from app.providers.gemini import GeminiProvider
+from app.ratelimit import rate_limit
 from app.schemas import QCMResponse
 
 router = APIRouter(prefix="/v1", tags=["qcm"])
@@ -18,7 +18,11 @@ def get_provider() -> QCMProvider:
     return GeminiProvider()
 
 
-@router.post("/qcm", response_model=QCMResponse, dependencies=[Depends(verify_token)])
+@router.post(
+    "/qcm",
+    response_model=QCMResponse,
+    dependencies=[Depends(verify_token), Depends(rate_limit)],
+)
 async def create_qcm(
     file: UploadFile = File(...),
     nb_questions: int = Form(10, ge=1, le=30),
