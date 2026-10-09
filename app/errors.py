@@ -30,3 +30,7 @@ class GenerationFailedError(ApiError):
 class InvalidPdfError(ApiError):
     status_code = 400
     code = "invalid_pdf"
+
+class RateLimitError(ApiError):
+    status_code = 429
+    code = "rate_limited"
