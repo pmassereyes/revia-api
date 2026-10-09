@@ -1,0 +1,1 @@
+# errors.py - RevIA API
