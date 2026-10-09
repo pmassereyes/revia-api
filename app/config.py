@@ -7,5 +7,6 @@ class Settings(BaseSettings):
     api_token: str = ""
     gemini_model: str = "gemini-2.5-flash"
     max_pdf_mb: int = 20
+    rate_limit_per_minute: int = 10
 
 settings = Settings()
