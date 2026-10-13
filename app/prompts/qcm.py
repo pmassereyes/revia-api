@@ -1,4 +1,6 @@
 # qcm.py - RevIA API
+PROMPT_VERSION = "1"
+
 def build_prompt(nb_questions: int) -> str:
     return f"""<Tu es un enseignant-concepteur d'évaluations en informatique (niveau Licence, CNAM). Ta tâche : produire des QCM de révision à partir du document de cours fourni, et uniquement à partir de lui.
 

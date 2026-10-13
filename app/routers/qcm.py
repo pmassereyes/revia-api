@@ -9,13 +9,14 @@ from app.providers.base import QCMProvider
 from app.providers.gemini import GeminiProvider
 from app.ratelimit import rate_limit
 from app.schemas import QCMResponse
+from app.cache import CachedProvider
 
 router = APIRouter(prefix="/v1", tags=["qcm"])
 
 
 @lru_cache
 def get_provider() -> QCMProvider:
-    return GeminiProvider()
+    return CachedProvider(GeminiProvider(), settings.cache_dir)
 
 
 @router.post(

@@ -8,5 +8,6 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     max_pdf_mb: int = 20
     rate_limit_per_minute: int = 10
+    cache_dir: str = ".cache"
 
 settings = Settings()
