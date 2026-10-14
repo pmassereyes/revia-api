@@ -13,13 +13,13 @@ dependencies = [
   "pydantic-settings",
   "python-multipart",   # upload PDF multipart
   "google-genai",       # appel à Gemini (utilisé à partir de la Phase 1)
+  "httpx",              # transport de google-genai : délais et erreurs réseau interceptés
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest",
   "pytest-cov",         # couverture des tests, importée par SonarQube Cloud
-  "httpx",              # requis par TestClient de FastAPI
   "ruff",
 ]
 
