@@ -66,7 +66,7 @@ Chaîne d'une requête : `routers/qcm.py` → `get_provider()` → `CachedProvid
 
 ## Tests
 
-- Aucun test n'appelle Gemini. La route se teste avec `app.dependency_overrides[get_provider] = lambda: FakeProvider()`, le cache avec un faux provider qui compte ses appels. Les deux renvoient `tests/fixtures/reponse_exemple.json`.
+- Aucun test n'appelle Gemini. La route se teste avec `app.dependency_overrides[get_provider] = lambda: FakeProvider()`, le cache avec un faux provider qui compte ses appels. Les deux renvoient `tests/fixtures/reponse_exemple.json`. `GeminiProvider` se teste avec un faux client (`FakeModels`) injecté dans `provider._client`. Les erreurs Gemini se simulent avec `errors.ClientError` / `errors.ServerError(code, {...})`.
 - Les réglages se modifient par `monkeypatch.setattr(settings, ...)`. Le compteur de rate limit est global au module : appeler `ratelimit.reset()` dans les fixtures.
 - Méthodes async testées hors route : `asyncio.run(...)`, sans plugin pytest-asyncio.
 
