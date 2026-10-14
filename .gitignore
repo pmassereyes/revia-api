@@ -11,5 +11,5 @@ __pycache__/
 .coverage
 coverage.xml
 rapport-tests.xml
-ruff-report.json
 .scannerwork/
+.DS_Store

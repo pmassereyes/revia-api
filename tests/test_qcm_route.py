@@ -1,14 +1,15 @@
+# test_qcm_route.py - RevIA API
 import json
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app import ratelimit
 from app.config import settings
 from app.main import app
 from app.routers.qcm import get_provider
 from app.schemas import QCMResponse
-from app import ratelimit
 
 FIXTURE = Path(__file__).parent / "fixtures" / "reponse_exemple.json"
 PDF = b"%PDF-1.4 faux pdf pour les tests"
@@ -22,15 +23,12 @@ class FakeProvider:
 
 @pytest.fixture
 def client(monkeypatch):
-    from app import ratelimit
-
-@pytest.fixture
-def client(monkeypatch):
     monkeypatch.setattr(settings, "api_token", "test-token")
     ratelimit.reset()
     app.dependency_overrides[get_provider] = lambda: FakeProvider()
     yield TestClient(app)
     app.dependency_overrides.clear()
+
 
 def test_rate_limit(client, monkeypatch):
     monkeypatch.setattr(settings, "rate_limit_per_minute", 2)
