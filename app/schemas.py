@@ -24,6 +24,11 @@ class Question(CamelModel):
 
 class QCMResponse(CamelModel):
     qcm: list[Question] = Field(min_length=1)
+    avertissement: str | None = Field(
+        default=None,
+        description="Renseigné seulement si le document ne permet pas de produire le nombre "
+        "de questions demandé ; null sinon.",
+    )
 
 
 class ErrorResponse(CamelModel):

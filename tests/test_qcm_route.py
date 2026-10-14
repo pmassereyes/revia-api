@@ -53,6 +53,7 @@ def test_ok(client):
     r = post(client)
     assert r.status_code == 200
     assert r.json()["qcm"][0]["indexBonneReponse"] == 1
+    assert r.json()["avertissement"] is None
 
 
 def test_sans_jeton(client):

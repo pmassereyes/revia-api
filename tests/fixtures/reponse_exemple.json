@@ -7,5 +7,6 @@
         "explication": "TCP garantit l'ordre et la livraison des paquets, contrairement à UDP.",
         "theme": "Réseaux"
       }
-    ]
+    ],
+    "avertissement": null
   }
