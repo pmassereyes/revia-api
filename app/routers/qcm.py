@@ -1,15 +1,17 @@
+# qcm.py - RevIA API
 from functools import lru_cache
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.auth import verify_token
+from app.cache import CachedProvider
 from app.config import settings
 from app.errors import InvalidPdfError, PdfTooLargeError
 from app.providers.base import QCMProvider
 from app.providers.gemini import GeminiProvider
 from app.ratelimit import rate_limit
 from app.schemas import QCMResponse
-from app.cache import CachedProvider
 
 router = APIRouter(prefix="/v1", tags=["qcm"])
 
@@ -25,9 +27,9 @@ def get_provider() -> QCMProvider:
     dependencies=[Depends(verify_token), Depends(rate_limit)],
 )
 async def create_qcm(
-    file: UploadFile = File(...),
-    nb_questions: int = Form(10, ge=1, le=30),
-    provider: QCMProvider = Depends(get_provider),
+    file: Annotated[UploadFile, File()],
+    provider: Annotated[QCMProvider, Depends(get_provider)],
+    nb_questions: Annotated[int, Form(ge=1, le=30)] = 10,
 ) -> QCMResponse:
     max_bytes = settings.max_pdf_mb * 1024 * 1024
     pdf = await file.read(max_bytes + 1)  # on ne lit jamais plus que la limite + 1 octet

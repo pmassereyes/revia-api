@@ -36,7 +36,7 @@ cp .env.example .env          # GEMINI_API_KEY, API_TOKEN, GEMINI_MODEL, MAX_PDF
 make dev                      # uvicorn --reload, 0.0.0.0:8000 ; Swagger sur /docs
 make test                     # pytest
 make coverage                 # pytest + coverage.xml + rapport-tests.xml (mêmes commandes qu'en CI)
-make lint                     # ruff check
+make lint                     # ruff check, bloquant en CI
 
 .venv/bin/pytest tests/test_qcm_route.py::test_rate_limit   # un seul test
 .venv/bin/ruff check --fix .
@@ -80,7 +80,8 @@ Un seul workflow, `.github/workflows/ci-cd.yml` :
 | Push sur `dev` | oui | non | publication `dev` + `sha-<commit>` |
 | Push sur `main` | oui | oui | publication `latest` + `sha-<commit>` |
 
-- **Sonar** (SonarQube Cloud, offre gratuite) : `main` est sa seule branche principale possible, et une analyse de `dev` serait refusée. `sonar.qualitygate.wait=true` fait échouer la pipeline si le Quality Gate échoue. Ce Quality Gate exige 80 % de couverture sur le code nouveau : chaque PR apporte ses tests. Les rapports (couverture, JUnit, ruff en JSON) sont produits par le job `tests` sous 3.11 et transmis en artefact.
+- **Sonar** (SonarQube Cloud, offre gratuite) : `main` est sa seule branche principale possible, et une analyse de `dev` serait refusée. `sonar.qualitygate.wait=true` fait échouer la pipeline si le Quality Gate échoue. Ce Quality Gate exige 80 % de couverture sur le code nouveau : chaque PR apporte ses tests. Les rapports (couverture, JUnit) sont produits par le job `tests` sous 3.11 et transmis en artefact.
+- **Lint** : `make lint` tourne dans le job `tests` sous 3.11, et une erreur ruff fait échouer la pipeline.
 - **Image** : `ghcr.io/pmassereyes/revia-api`, en `linux/amd64`. Le test de démarrage vérifie `/health`, puis qu'un `POST /v1/qcm` avec un jeton valide et un fichier non PDF renvoie 400. Un 500 trahirait un provider impossible à construire, par exemple un cache non accessible en écriture.
 - Les actions sont figées par SHA, avec la version en commentaire. Pour en mettre une à jour, résoudre le SHA du nouveau tag (`gh api repos/<action>/git/ref/tags/<tag>`).
 - Le `Dockerfile` installe les dépendances lues dans `pyproject.toml`, dans une couche séparée : une nouvelle dépendance n'y demande aucune modification. L'image tourne sous un utilisateur non root, avec le cache dans `/app/.cache`. `.dockerignore` est une liste blanche (`pyproject.toml` et `app/` seulement).
@@ -92,5 +93,6 @@ Un seul workflow, `.github/workflows/ci-cd.yml` :
 ## Conventions
 
 - Français pour les identifiants métier, les commentaires, les noms de tests (`test_pdf_trop_lourd`) et les messages d'erreur destinés à l'utilisateur.
-- La plupart des modules commencent par l'en-tête `# <fichier>.py - RevIA API`.
-- Ruff avec `line-length = 100`.
+- Chaque fichier Python commence par l'en-tête `# <fichier>.py - RevIA API`.
+- Ruff avec `line-length = 100`, règles par défaut (dont I et B).
+- Les paramètres FastAPI (`Depends`, `File`, `Form`, `Header`) se déclarent avec `Annotated[...]`. L'ancien style `x = Depends(...)` déclenche B008.

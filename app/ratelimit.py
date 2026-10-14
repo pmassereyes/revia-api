@@ -1,5 +1,7 @@
+# ratelimit.py - RevIA API
 import time
 from collections import defaultdict, deque
+from typing import Annotated
 
 from fastapi import Header
 
@@ -13,7 +15,7 @@ def reset() -> None:
     _hits.clear()
 
 
-def rate_limit(x_api_token: str = Header(default="")) -> None:
+def rate_limit(x_api_token: Annotated[str, Header()] = "") -> None:
     now = time.monotonic()
     window = _hits[x_api_token]
     while window and now - window[0] >= 60:
