@@ -2,7 +2,7 @@
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
 
 from app.auth import verify_token
 from app.cache import CachedProvider
@@ -27,13 +27,17 @@ def get_provider() -> QCMProvider:
 @router.post(
     "/qcm",
     response_model=QCMResponse,
-    dependencies=[Depends(verify_token), Depends(rate_limit)],
+    dependencies=[Depends(verify_token)],
 )
 async def create_qcm(
     file: Annotated[UploadFile, File()],
     provider: Annotated[QCMProvider, Depends(get_provider)],
+    x_api_token: Annotated[str, Header()] = "",
     nb_questions: Annotated[int, Form(ge=1, le=30)] = 10,
 ) -> QCMResponse:
+    # Décompté ici et non en dépendance : FastAPI exécute toutes les dépendances avant de
+    # signaler les erreurs de validation, et une requête rejetée en 422 consommerait le quota
+    rate_limit(x_api_token)
     max_bytes = settings.max_pdf_mb * 1024 * 1024
     pdf = await file.read(max_bytes + 1)  # on ne lit jamais plus que la limite + 1 octet
     if len(pdf) > max_bytes:
