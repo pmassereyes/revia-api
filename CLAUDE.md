@@ -31,7 +31,7 @@ Le Python système (3.9) est trop ancien (`requires-python >= 3.11`). Le Makefil
 
 ```bash
 uv venv && uv pip install -e ".[dev]"
-cp .env.example .env          # GEMINI_API_KEY, API_TOKEN, GEMINI_MODEL, MAX_PDF_MB, RATE_LIMIT_PER_MINUTE, CACHE_DIR
+cp .env.example .env          # GEMINI_API_KEY, API_TOKEN, GEMINI_MODEL, MAX_PDF_MB, RATE_LIMIT_PER_MINUTE, CACHE_DIR, LOG_LEVEL
 
 make dev                      # uvicorn --reload, 0.0.0.0:8000 ; Swagger sur /docs
 make test                     # pytest
@@ -62,6 +62,7 @@ Chaîne d'une requête : `routers/qcm.py` → `get_provider()` → `CachedProvid
 - **Rate limit** (`ratelimit.py`) : fenêtre glissante de 60 s, en mémoire, propre au processus, indexée par jeton. Il n'est pas déclaré en dépendance, car FastAPI exécute toutes les dépendances avant de signaler les erreurs de validation. Le jeton étant partagé par toutes les installations de l'app, la limite est en pratique globale.
 - **Erreurs** (`errors.py`) : toute erreur destinée au client est une sous-classe de `ApiError` qui porte `status_code` et `code`. Le handler de `main.py` la convertit en `ErrorResponse`. On lève ces exceptions, jamais `HTTPException`. Deux autres handlers complètent le dispositif : `RequestValidationError` donne `invalid_request` (avec les champs en cause), et toute autre exception donne `internal_error`. Starlette relance alors l'exception, si bien que la trace reste dans les journaux du serveur.
 - **Schémas** (`schemas.py`) : tous les modèles héritent de `CamelModel`, donc du snake_case côté Python et du camelCase dans le JSON (`by_alias=True` pour sérialiser). `Question` vérifie que `index_bonne_reponse` désigne bien une proposition.
+- **Journaux** (`logs.py`) : `setup_logging()` configure le logger `app` au démarrage. Chaque module utilise `logging.getLogger(__name__)`. Le format est du texte `clé=valeur` (`generation …`, `cache=hit|miss …`, `echec_gemini …`, `reponse_gemini_invalide …`, `erreur code=… statut=…`). Un PDF s'identifie par `empreinte(pdf)` (8 caractères du SHA-256). **Ne jamais journaliser le contenu du PDF, la clé Gemini ni le jeton** : des tests le vérifient. Dans les tests, `caplog.set_level(logging.INFO, logger="app")`.
 - **Config** (`config.py`) : singleton `settings` (pydantic-settings, lu depuis `.env`). Les valeurs sont lues à l'appel, pas à l'import. Toute nouvelle variable va dans `Settings` et dans `.env.example`.
 
 ## Tests

@@ -1,5 +1,6 @@
 # test_qcm_route.py - RevIA API
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from app import ratelimit
 from app.cache import CachedProvider
 from app.config import settings
+from app.logs import empreinte
 from app.main import app
 from app.routers.qcm import get_provider
 from app.schemas import QCMResponse
@@ -140,3 +142,19 @@ def test_rate_limit_ignore_les_requetes_invalides(client, monkeypatch):
     assert post(client).status_code == 200
     assert post(client).status_code == 200
     assert post(client).status_code == 429
+
+
+def test_generation_journalisee_sans_secret(client, caplog):
+    caplog.set_level(logging.INFO, logger="app")
+    assert post(client).status_code == 200
+    ligne = next(m for m in caplog.messages if m.startswith("generation "))
+    assert f"empreinte={empreinte(PDF)}" in ligne
+    assert "nb_demande=5 nb_obtenu=1 avertissement=non" in ligne
+    assert "test-token" not in caplog.text
+    assert "faux pdf" not in caplog.text
+
+
+def test_erreur_client_journalisee(client, caplog):
+    caplog.set_level(logging.INFO, logger="app")
+    post(client, headers={})
+    assert "erreur code=invalid_token statut=401 chemin=/v1/qcm" in caplog.messages
