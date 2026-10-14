@@ -31,7 +31,7 @@ Le Python système (3.9) est trop ancien (`requires-python >= 3.11`). Le Makefil
 
 ```bash
 uv venv && uv pip install -e ".[dev]"
-cp .env.example .env          # GEMINI_API_KEY, API_TOKEN, GEMINI_MODEL, MAX_PDF_MB, RATE_LIMIT_PER_MINUTE, CACHE_DIR, LOG_LEVEL
+cp .env.example .env          # GEMINI_API_KEY, API_TOKEN, GEMINI_MODEL, GEMINI_TIMEOUT_S, GEMINI_ATTEMPTS, MAX_PDF_MB, RATE_LIMIT_PER_MINUTE, CACHE_DIR, LOG_LEVEL
 
 make dev                      # uvicorn --reload, 0.0.0.0:8000 ; Swagger sur /docs
 make test                     # pytest
@@ -48,7 +48,7 @@ docker compose up --build     # API dans un conteneur, construit en natif, lit .
 
 `POST /v1/qcm` reçoit un formulaire multipart : `file` (PDF) et `nb_questions` (1 à 30, 10 par défaut). `verify_token` s'exécute en dépendance. `rate_limit` est appelé au début de la route, donc après la validation : une requête rejetée en 401 ou 422 ne consomme pas le quota, alors qu'un rejet en 400 ou 413 le consomme.
 - Succès : `QCMResponse`, soit `{"qcm": [{question, propositions, indexBonneReponse, explication, theme}], "avertissement": null}`. `avertissement` contient une phrase quand le document ne permet pas de produire le nombre de questions demandé.
-- Erreur : toujours `{"code", "message"}`, y compris pour la validation et les erreurs imprévues, avec un code stable que l'app peut tester (`invalid_request` 422, `invalid_token` 401, `invalid_pdf` 400, `pdf_too_large` 413, `rate_limited` 429, `quota_exceeded` 429, `generation_failed` 502, `provider_unavailable` 503 quand la clé Gemini est absente, `internal_error` 500). Les deux 429 se distinguent par `code` : `rate_limited` vient de la limite locale, `quota_exceeded` du quota Gemini.
+- Erreur : toujours `{"code", "message"}`, y compris pour la validation et les erreurs imprévues, avec un code stable que l'app peut tester (`invalid_request` 422, `invalid_token` 401, `invalid_pdf` 400, `pdf_too_large` 413, `rate_limited` 429, `quota_exceeded` 429, `generation_failed` 502, `generation_timeout` 504, `provider_unavailable` 503 quand la clé Gemini est absente, `internal_error` 500). Les deux 429 se distinguent par `code` : `rate_limited` vient de la limite locale, `quota_exceeded` du quota Gemini.
 
 `GET /health` sert de sonde.
 
@@ -56,7 +56,7 @@ docker compose up --build     # API dans un conteneur, construit en natif, lit .
 
 Chaîne d'une requête : `routers/qcm.py` → `get_provider()` → `CachedProvider` → `GeminiProvider` → Gemini.
 
-- **Provider** : `providers/base.py` définit `QCMProvider`, un `Protocol` (typage structurel, pas d'héritage). `GeminiProvider` envoie le PDF brut (`Part.from_bytes`) et le prompt, demande une sortie structurée (`response_schema=QCMResponse`), puis revalide la réponse avec Pydantic. Les `Field(description=...)` des schémas sont transmises à Gemini avec `response_schema` : elles font partie du prompt. Un 429 Gemini lève `QuotaExceededError`, toute autre erreur `GenerationFailedError`.
+- **Provider** : `providers/base.py` définit `QCMProvider`, un `Protocol` (typage structurel, pas d'héritage). `GeminiProvider` envoie le PDF brut (`Part.from_bytes`) et le prompt, demande une sortie structurée (`response_schema=QCMResponse`), puis revalide la réponse avec Pydantic. Les `Field(description=...)` des schémas sont transmises à Gemini avec `response_schema` : elles font partie du prompt. Le client est configuré avec un délai maximal par tentative (`GEMINI_TIMEOUT_S`) et `GEMINI_ATTEMPTS` tentatives au total. Les nouvelles tentatives, gérées par `google-genai`, couvrent les 500 à 504, les dépassements de délai et les erreurs de connexion, mais pas les 429. Un 429 lève `QuotaExceededError`, un délai encore dépassé après toutes les tentatives `GenerationTimeoutError` (504), et toute autre erreur `GenerationFailedError`.
 - **Assemblage** : `get_provider()` (dans `routers/qcm.py`, avec `@lru_cache`) construit le singleton `CachedProvider(GeminiProvider())`. Sans `GEMINI_API_KEY`, il lève `ProviderUnavailableError`. `lru_cache` ne mémorise pas les exceptions : la clé est revérifiée à chaque requête. Dans les tests qui appellent le vrai `get_provider`, appeler `get_provider.cache_clear()`. Un nouveau fournisseur ou un nouveau décorateur se branche ici.
 - **Cache** (`cache.py`) : un fichier JSON par génération dans `CACHE_DIR`. La clé est le SHA-256 de `sha256(pdf) | nb_questions | gemini_model | PROMPT_VERSION`. L'écriture est atomique (`.tmp` puis `os.replace`), et un fichier illisible est supprimé puis régénéré. **Toute modification du prompt doit incrémenter `PROMPT_VERSION`** dans `prompts/qcm.py`, sinon le cache ressert les QCM de l'ancien prompt.
 - **Rate limit** (`ratelimit.py`) : fenêtre glissante de 60 s, en mémoire, propre au processus, indexée par jeton. Il n'est pas déclaré en dépendance, car FastAPI exécute toutes les dépendances avant de signaler les erreurs de validation. Le jeton étant partagé par toutes les installations de l'app, la limite est en pratique globale.
@@ -67,7 +67,7 @@ Chaîne d'une requête : `routers/qcm.py` → `get_provider()` → `CachedProvid
 
 ## Tests
 
-- Aucun test n'appelle Gemini. La route se teste avec `app.dependency_overrides[get_provider] = lambda: FakeProvider()`, le cache avec un faux provider qui compte ses appels. Les deux renvoient `tests/fixtures/reponse_exemple.json`. `GeminiProvider` se teste avec un faux client (`FakeModels`) injecté dans `provider._client`. Les erreurs Gemini se simulent avec `errors.ClientError` / `errors.ServerError(code, {...})`.
+- Aucun test n'appelle Gemini. La route se teste avec `app.dependency_overrides[get_provider] = lambda: FakeProvider()`, le cache avec un faux provider qui compte ses appels. Les deux renvoient `tests/fixtures/reponse_exemple.json`. `GeminiProvider` se teste avec un faux client (`FakeModels`) injecté dans `provider._client`. Les erreurs Gemini se simulent avec `errors.ClientError` / `errors.ServerError(code, {...})`, et les erreurs réseau avec `httpx.ReadTimeout` / `httpx.ConnectError`.
 - Les réglages se modifient par `monkeypatch.setattr(settings, ...)`. Le compteur de rate limit est global au module : appeler `ratelimit.reset()` dans les fixtures.
 - Méthodes async testées hors route : `asyncio.run(...)`, sans plugin pytest-asyncio.
 

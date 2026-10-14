@@ -13,10 +13,12 @@ def test_niveau_regle_par_la_config_sans_doublon(monkeypatch):
     try:
         setup_logging()
         setup_logging()
-        assert logger.level == logging.DEBUG
-        assert len(logger.handlers) == 1
+        for nom in ("app", "google_genai._api_client"):
+            assert logging.getLogger(nom).level == logging.DEBUG
+            assert len(logging.getLogger(nom).handlers) == 1
     finally:
         logger.setLevel(niveau_initial)
+        logging.getLogger("google_genai._api_client").setLevel(niveau_initial)
 
 
 def test_empreinte_courte_et_stable():
