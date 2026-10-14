@@ -1,6 +1,7 @@
 # test_gemini_provider.py - RevIA API
 import asyncio
 import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -62,15 +63,17 @@ def test_reponse_valide(monkeypatch):
 
 def test_quota_gemini_depasse(monkeypatch):
     provider = provider_avec(FakeModels(erreur=erreur_gemini(429)), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)  # la coroutine est créée hors du bloc raises
     with pytest.raises(QuotaExceededError):
-        asyncio.run(provider.generate_qcm(PDF, 5))
+        asyncio.run(appel)
 
 
 @pytest.mark.parametrize("code", [400, 403, 500, 503])
 def test_autre_erreur_gemini(monkeypatch, code):
     provider = provider_avec(FakeModels(erreur=erreur_gemini(code)), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)  # la coroutine est créée hors du bloc raises
     with pytest.raises(GenerationFailedError):
-        asyncio.run(provider.generate_qcm(PDF, 5))
+        asyncio.run(appel)
 
 
 def qcm_index_hors_bornes() -> str:
@@ -90,5 +93,26 @@ def qcm_index_hors_bornes() -> str:
 )
 def test_reponse_inexploitable(monkeypatch, texte):
     provider = provider_avec(FakeModels(texte=texte), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)  # la coroutine est créée hors du bloc raises
     with pytest.raises(GenerationFailedError):
-        asyncio.run(provider.generate_qcm(PDF, 5))
+        asyncio.run(appel)
+
+
+def test_echec_gemini_journalise_sans_cle(monkeypatch, caplog):
+    caplog.set_level(logging.WARNING, logger="app")
+    provider = provider_avec(FakeModels(erreur=erreur_gemini(503)), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)  # la coroutine est créée hors du bloc raises
+    with pytest.raises(GenerationFailedError):
+        asyncio.run(appel)
+    assert f"echec_gemini code=503 statut=X modele={settings.gemini_model}" in caplog.text
+    assert "message=erreur simulée" in caplog.text
+    assert "cle-factice" not in caplog.text
+
+
+def test_reponse_invalide_journalisee(monkeypatch, caplog):
+    caplog.set_level(logging.WARNING, logger="app")
+    provider = provider_avec(FakeModels(texte='{"qcm": []}'), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)  # la coroutine est créée hors du bloc raises
+    with pytest.raises(GenerationFailedError):
+        asyncio.run(appel)
+    assert caplog.messages == ["reponse_gemini_invalide erreurs=1 premier_champ=qcm type=too_short"]

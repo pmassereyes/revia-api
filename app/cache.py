@@ -1,12 +1,16 @@
 # cache.py - RevIA API
 import hashlib
+import logging
 import os
 from pathlib import Path
 
 from app.config import settings
+from app.logs import empreinte
 from app.prompts.qcm import PROMPT_VERSION
 from app.providers.base import QCMProvider
 from app.schemas import QCMResponse
+
+logger = logging.getLogger(__name__)
 
 
 class CachedProvider:
@@ -26,10 +30,14 @@ class CachedProvider:
 
         if path.exists():
             try:
-                return QCMResponse.model_validate_json(path.read_text(encoding="utf-8"))
+                cached = QCMResponse.model_validate_json(path.read_text(encoding="utf-8"))
+                logger.info("cache=hit empreinte=%s", empreinte(pdf))
+                return cached
             except ValueError:
+                logger.warning("cache=corrompu empreinte=%s", empreinte(pdf))
                 path.unlink(missing_ok=True)  # fichier corrompu : on régénère
 
+        logger.info("cache=miss empreinte=%s", empreinte(pdf))
         result = await self._inner.generate_qcm(pdf, nb_questions)
 
         tmp = path.with_suffix(".tmp")
