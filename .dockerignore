@@ -1,0 +1,5 @@
+# Liste blanche : seuls pyproject.toml et app/ entrent dans l'image (jamais .env, .git ni les tests)
+*
+!pyproject.toml
+!app/
+**/__pycache__

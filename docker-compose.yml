@@ -1,0 +1,16 @@
+# Lancement local de l'API : docker compose up --build
+# L'image est construite sur la machine (native sur Mac Apple Silicon).
+# Pour utiliser l'image publiée (linux/amd64), remplacer « build: . » par :
+#   image: ghcr.io/pmassereyes/revia-api:dev
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - cache-qcm:/app/.cache
+    restart: unless-stopped
+
+volumes:
+  cache-qcm:
