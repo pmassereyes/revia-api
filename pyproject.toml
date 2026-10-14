@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest",
+  "pytest-cov",         # couverture des tests, importée par SonarQube Cloud
   "httpx",              # requis par TestClient de FastAPI
   "ruff",
 ]
@@ -27,6 +28,11 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+relative_files = true   # chemins relatifs dans coverage.xml, requis par SonarQube Cloud
 
 [tool.ruff]
 line-length = 100

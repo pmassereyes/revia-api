@@ -6,3 +6,10 @@ __pycache__/
 .ruff_cache/
 .cache/
 *.egg-info/
+
+# Rapports de tests et de qualite
+.coverage
+coverage.xml
+rapport-tests.xml
+ruff-report.json
+.scannerwork/
