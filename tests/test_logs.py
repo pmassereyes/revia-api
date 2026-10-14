@@ -1,4 +1,5 @@
 # test_logs.py - RevIA API
+import hashlib
 import logging
 
 from app.config import settings
@@ -19,6 +20,6 @@ def test_niveau_regle_par_la_config_sans_doublon(monkeypatch):
 
 
 def test_empreinte_courte_et_stable():
-    assert empreinte(b"%PDF-1.4 a") == empreinte(b"%PDF-1.4 a")
-    assert empreinte(b"%PDF-1.4 a") != empreinte(b"%PDF-1.4 b")
-    assert len(empreinte(b"%PDF-1.4 a")) == 8
+    pdf = b"%PDF-1.4 a"
+    assert empreinte(pdf) == hashlib.sha256(pdf).hexdigest()[:8]
+    assert empreinte(pdf) != empreinte(b"%PDF-1.4 b")
