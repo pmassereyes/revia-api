@@ -12,4 +12,7 @@ __pycache__/
 coverage.xml
 rapport-tests.xml
 .scannerwork/
+
+# Réponses des essais réels (make essai)
+essais/
 .DS_Store

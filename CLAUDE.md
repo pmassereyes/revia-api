@@ -42,7 +42,13 @@ make lint                     # ruff check, bloquant en CI
 .venv/bin/ruff check --fix .
 
 docker compose up --build     # API dans un conteneur, construit en natif, lit .env
+
+# Essais réels avec la vraie clé Gemini du .env (consomment le quota, hors CI), API lancée par make dev
+make essai PDF=chemin/cours.pdf NB=10   # résumé + JSON complet dans essais/ (ignoré par Git)
+make essai-pauvre                       # PDF d'une phrase : Gemini doit remplir « avertissement »
 ```
+
+Claude n'a jamais la clé Gemini : les essais réels sont lancés par l'utilisateur, qui colle ensuite la sortie et les journaux de l'API.
 
 ## API exposée
 
