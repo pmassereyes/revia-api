@@ -1,4 +1,6 @@
 # qcm.py - RevIA API
+import logging
+import time
 from functools import lru_cache
 from typing import Annotated
 
@@ -8,11 +10,13 @@ from app.auth import verify_token
 from app.cache import CachedProvider
 from app.config import settings
 from app.errors import InvalidPdfError, PdfTooLargeError, ProviderUnavailableError
+from app.logs import empreinte
 from app.providers.base import QCMProvider
 from app.providers.gemini import GeminiProvider
 from app.ratelimit import rate_limit
 from app.schemas import QCMResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["qcm"])
 
 
@@ -44,4 +48,15 @@ async def create_qcm(
         raise PdfTooLargeError(f"PDF trop lourd (max {settings.max_pdf_mb} Mo).")
     if not pdf.startswith(b"%PDF-"):
         raise InvalidPdfError("Le fichier n'est pas un PDF valide.")
-    return await provider.generate_qcm(pdf, nb_questions)
+    debut = time.perf_counter()
+    resultat = await provider.generate_qcm(pdf, nb_questions)
+    logger.info(
+        "generation empreinte=%s pdf_ko=%d nb_demande=%d nb_obtenu=%d avertissement=%s duree_ms=%d",
+        empreinte(pdf),
+        len(pdf) // 1024,
+        nb_questions,
+        len(resultat.qcm),
+        "oui" if resultat.avertissement else "non",
+        (time.perf_counter() - debut) * 1000,
+    )
+    return resultat

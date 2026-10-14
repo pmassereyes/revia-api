@@ -1,9 +1,11 @@
 # test_cache.py - RevIA API
 import asyncio
 import json
+import logging
 from pathlib import Path
 
 from app.cache import CachedProvider
+from app.logs import empreinte
 from app.schemas import QCMResponse
 
 FIXTURE = Path(__file__).parent / "fixtures" / "reponse_exemple.json"
@@ -44,3 +46,10 @@ def test_cache_corrompu_regenere(tmp_path):
         f.write_text("pas du json")
     asyncio.run(cached.generate_qcm(PDF, 5))
     assert inner.calls == 2
+
+def test_cache_journalise(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="app")
+    cached = CachedProvider(CountingProvider(), tmp_path)
+    asyncio.run(cached.generate_qcm(PDF, 5))
+    asyncio.run(cached.generate_qcm(PDF, 5))
+    assert caplog.messages == [f"cache=miss empreinte={empreinte(PDF)}", f"cache=hit empreinte={empreinte(PDF)}"]

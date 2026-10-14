@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     max_pdf_mb: int = 20
     rate_limit_per_minute: int = 10
     cache_dir: str = ".cache"
+    log_level: str = "INFO"
 
 settings = Settings()
