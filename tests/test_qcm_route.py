@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import ratelimit
+from app.cache import CachedProvider
 from app.config import settings
 from app.main import app
 from app.routers.qcm import get_provider
@@ -69,3 +70,57 @@ def test_pdf_trop_lourd(client, monkeypatch):
 def test_pas_un_pdf(client):
     r = post(client, content=b"ceci n'est pas un pdf")
     assert r.status_code == 400
+
+def test_nb_questions_hors_bornes(client):
+    r = client.post(
+        "/v1/qcm",
+        headers=HEADERS,
+        files={"file": ("cours.pdf", PDF, "application/pdf")},
+        data={"nb_questions": "31"},
+    )
+    assert r.status_code == 422
+    assert r.json()["code"] == "invalid_request"
+    assert "nb_questions" in r.json()["message"]
+
+
+def test_fichier_manquant(client):
+    r = client.post("/v1/qcm", headers=HEADERS, data={"nb_questions": "5"})
+    assert r.status_code == 422
+    assert r.json()["code"] == "invalid_request"
+    assert "file" in r.json()["message"]
+
+
+def test_cle_gemini_absente(client, monkeypatch):
+    app.dependency_overrides.clear()  # on teste le vrai get_provider
+    get_provider.cache_clear()
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    r = post(client)
+    assert r.status_code == 503
+    assert r.json()["code"] == "provider_unavailable"
+
+
+class ProviderEnPanne:
+    async def generate_qcm(self, pdf: bytes, nb_questions: int) -> QCMResponse:
+        raise RuntimeError("panne imprévue")
+
+
+def test_erreur_imprevue(monkeypatch):
+    monkeypatch.setattr(settings, "api_token", "test-token")
+    ratelimit.reset()
+    app.dependency_overrides[get_provider] = lambda: ProviderEnPanne()
+    try:
+        r = post(TestClient(app, raise_server_exceptions=False))
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 500
+    assert r.json() == {"code": "internal_error", "message": "Erreur interne du serveur."}
+
+
+def test_provider_construit_avec_cle(monkeypatch, tmp_path):
+    get_provider.cache_clear()
+    monkeypatch.setattr(settings, "gemini_api_key", "cle-factice")
+    monkeypatch.setattr(settings, "cache_dir", str(tmp_path))
+    try:
+        assert isinstance(get_provider(), CachedProvider)
+    finally:
+        get_provider.cache_clear()

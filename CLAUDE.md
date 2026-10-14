@@ -48,7 +48,7 @@ docker compose up --build     # API dans un conteneur, construit en natif, lit .
 
 `POST /v1/qcm` reçoit un formulaire multipart : `file` (PDF) et `nb_questions` (1 à 30, 10 par défaut). Les dépendances `verify_token` puis `rate_limit` s'exécutent avant la route.
 - Succès : `QCMResponse`, soit `{"qcm": [{question, propositions, indexBonneReponse, explication, theme}]}`.
-- Erreur métier : `{"code", "message"}` avec un code stable que l'app peut tester (`invalid_token` 401, `invalid_pdf` 400, `pdf_too_large` 413, `rate_limited` 429, `quota_exceeded` 429, `generation_failed` 502). Les deux 429 se distinguent par `code` : `rate_limited` vient de la limite locale, `quota_exceeded` du quota Gemini.
+- Erreur : toujours `{"code", "message"}`, y compris pour la validation et les erreurs imprévues, avec un code stable que l'app peut tester (`invalid_request` 422, `invalid_token` 401, `invalid_pdf` 400, `pdf_too_large` 413, `rate_limited` 429, `quota_exceeded` 429, `generation_failed` 502, `provider_unavailable` 503 quand la clé Gemini est absente, `internal_error` 500). Les deux 429 se distinguent par `code` : `rate_limited` vient de la limite locale, `quota_exceeded` du quota Gemini.
 
 `GET /health` sert de sonde.
 
@@ -57,10 +57,10 @@ docker compose up --build     # API dans un conteneur, construit en natif, lit .
 Chaîne d'une requête : `routers/qcm.py` → `get_provider()` → `CachedProvider` → `GeminiProvider` → Gemini.
 
 - **Provider** : `providers/base.py` définit `QCMProvider`, un `Protocol` (typage structurel, pas d'héritage). `GeminiProvider` envoie le PDF brut (`Part.from_bytes`) et le prompt, demande une sortie structurée (`response_schema=QCMResponse`), puis revalide la réponse avec Pydantic. Un 429 Gemini lève `QuotaExceededError`, toute autre erreur `GenerationFailedError`.
-- **Assemblage** : `get_provider()` (dans `routers/qcm.py`, avec `@lru_cache`) construit le singleton `CachedProvider(GeminiProvider())`. Un nouveau fournisseur ou un nouveau décorateur se branche ici.
+- **Assemblage** : `get_provider()` (dans `routers/qcm.py`, avec `@lru_cache`) construit le singleton `CachedProvider(GeminiProvider())`. Sans `GEMINI_API_KEY`, il lève `ProviderUnavailableError`. `lru_cache` ne mémorise pas les exceptions : la clé est revérifiée à chaque requête. Dans les tests qui appellent le vrai `get_provider`, appeler `get_provider.cache_clear()`. Un nouveau fournisseur ou un nouveau décorateur se branche ici.
 - **Cache** (`cache.py`) : un fichier JSON par génération dans `CACHE_DIR`. La clé est le SHA-256 de `sha256(pdf) | nb_questions | gemini_model | PROMPT_VERSION`. L'écriture est atomique (`.tmp` puis `os.replace`), et un fichier illisible est supprimé puis régénéré. **Toute modification du prompt doit incrémenter `PROMPT_VERSION`** dans `prompts/qcm.py`, sinon le cache ressert les QCM de l'ancien prompt.
 - **Rate limit** (`ratelimit.py`) : fenêtre glissante de 60 s, en mémoire, propre au processus, indexée par jeton. Le jeton étant partagé par toutes les installations de l'app, la limite est en pratique globale.
-- **Erreurs** (`errors.py`) : toute erreur destinée au client est une sous-classe de `ApiError` qui porte `status_code` et `code`. Le handler de `main.py` la convertit en `ErrorResponse`. On lève ces exceptions, jamais `HTTPException`.
+- **Erreurs** (`errors.py`) : toute erreur destinée au client est une sous-classe de `ApiError` qui porte `status_code` et `code`. Le handler de `main.py` la convertit en `ErrorResponse`. On lève ces exceptions, jamais `HTTPException`. Deux autres handlers complètent le dispositif : `RequestValidationError` donne `invalid_request` (avec les champs en cause), et toute autre exception donne `internal_error`. Starlette relance alors l'exception, si bien que la trace reste dans les journaux du serveur.
 - **Schémas** (`schemas.py`) : tous les modèles héritent de `CamelModel`, donc du snake_case côté Python et du camelCase dans le JSON (`by_alias=True` pour sérialiser). `Question` vérifie que `index_bonne_reponse` désigne bien une proposition.
 - **Config** (`config.py`) : singleton `settings` (pydantic-settings, lu depuis `.env`). Les valeurs sont lues à l'appel, pas à l'import. Toute nouvelle variable va dans `Settings` et dans `.env.example`.
 

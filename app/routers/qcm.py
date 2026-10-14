@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from app.auth import verify_token
 from app.cache import CachedProvider
 from app.config import settings
-from app.errors import InvalidPdfError, PdfTooLargeError
+from app.errors import InvalidPdfError, PdfTooLargeError, ProviderUnavailableError
 from app.providers.base import QCMProvider
 from app.providers.gemini import GeminiProvider
 from app.ratelimit import rate_limit
@@ -18,6 +18,9 @@ router = APIRouter(prefix="/v1", tags=["qcm"])
 
 @lru_cache
 def get_provider() -> QCMProvider:
+    # Une exception n'est pas mise en cache par lru_cache : la clé est revérifiée à chaque requête
+    if not settings.gemini_api_key:
+        raise ProviderUnavailableError("Le service de génération n'est pas configuré.")
     return CachedProvider(GeminiProvider(), settings.cache_dir)
 
 

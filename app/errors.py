@@ -34,3 +34,13 @@ class InvalidPdfError(ApiError):
 class RateLimitError(ApiError):
     status_code = 429
     code = "rate_limited"
+
+
+class InvalidRequestError(ApiError):
+    status_code = 422
+    code = "invalid_request"
+
+
+class ProviderUnavailableError(ApiError):
+    status_code = 503
+    code = "provider_unavailable"
