@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     api_token: str = ""
     gemini_model: str = "gemini-3.8-flash"
+    gemini_timeout_s: int = 120   # par tentative
+    gemini_attempts: int = 2      # tentatives au total, nouvel essai compris
     max_pdf_mb: int = 20
     rate_limit_per_minute: int = 10
     cache_dir: str = ".cache"

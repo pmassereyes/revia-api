@@ -5,12 +5,14 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from google.genai import errors
 
 from app.config import settings
-from app.errors import GenerationFailedError, QuotaExceededError
+from app.errors import GenerationFailedError, GenerationTimeoutError, QuotaExceededError
 from app.prompts.qcm import build_prompt
+from app.providers import gemini
 from app.providers.gemini import GeminiProvider
 from app.schemas import QCMResponse
 
@@ -116,3 +118,36 @@ def test_reponse_invalide_journalisee(monkeypatch, caplog):
     with pytest.raises(GenerationFailedError):
         asyncio.run(appel)
     assert caplog.messages == ["reponse_gemini_invalide erreurs=1 premier_champ=qcm type=too_short"]
+
+
+def test_client_configure_avec_delai_et_tentatives(monkeypatch):
+    recus = {}
+    monkeypatch.setattr(gemini.genai, "Client", lambda **kwargs: recus.update(kwargs))
+    monkeypatch.setattr(settings, "gemini_timeout_s", 90)
+    monkeypatch.setattr(settings, "gemini_attempts", 3)
+    GeminiProvider()
+    options = recus["http_options"]
+    assert options.timeout == 90_000
+    assert options.retry_options.attempts == 3
+    assert 503 in options.retry_options.http_status_codes
+    assert 429 not in options.retry_options.http_status_codes
+
+
+def test_delai_depasse(monkeypatch, caplog):
+    caplog.set_level(logging.WARNING, logger="app")
+    provider = provider_avec(FakeModels(erreur=httpx.ReadTimeout("trop lent")), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)
+    with pytest.raises(GenerationTimeoutError):
+        asyncio.run(appel)
+    assert caplog.messages == [
+        f"delai_gemini_depasse timeout_s={settings.gemini_timeout_s} tentatives={settings.gemini_attempts}"
+    ]
+
+
+def test_erreur_reseau(monkeypatch, caplog):
+    caplog.set_level(logging.WARNING, logger="app")
+    provider = provider_avec(FakeModels(erreur=httpx.ConnectError("injoignable")), monkeypatch)
+    appel = provider.generate_qcm(PDF, 5)
+    with pytest.raises(GenerationFailedError):
+        asyncio.run(appel)
+    assert caplog.messages == ["echec_reseau_gemini exception=ConnectError"]

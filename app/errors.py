@@ -44,3 +44,8 @@ class InvalidRequestError(ApiError):
 class ProviderUnavailableError(ApiError):
     status_code = 503
     code = "provider_unavailable"
+
+
+class GenerationTimeoutError(ApiError):
+    status_code = 504
+    code = "generation_timeout"

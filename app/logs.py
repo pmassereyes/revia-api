@@ -8,12 +8,14 @@ FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
 
 
 def setup_logging() -> None:
-    """Journaux des modules « app.* », en plus de ceux d'uvicorn. Appel répétable sans doublon."""
+    """Journaux de l'application et des nouvelles tentatives Gemini. Appel répétable sans doublon."""
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter(FORMAT))
-    logger = logging.getLogger("app")
-    logger.handlers = [handler]
-    logger.setLevel(settings.log_level.upper())
+    # google_genai._api_client annonce ses nouvelles tentatives vers Gemini (niveau INFO)
+    for nom in ("app", "google_genai._api_client"):
+        logger = logging.getLogger(nom)
+        logger.handlers = [handler]
+        logger.setLevel(settings.log_level.upper())
 
 
 def empreinte(pdf: bytes) -> str:
