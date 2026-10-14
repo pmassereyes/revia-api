@@ -125,3 +125,18 @@ def test_provider_construit_avec_cle(monkeypatch, tmp_path):
         assert isinstance(get_provider(), CachedProvider)
     finally:
         get_provider.cache_clear()
+
+
+def test_rate_limit_ignore_les_requetes_invalides(client, monkeypatch):
+    monkeypatch.setattr(settings, "rate_limit_per_minute", 2)
+    for _ in range(3):
+        r = client.post(
+            "/v1/qcm",
+            headers=HEADERS,
+            files={"file": ("cours.pdf", PDF, "application/pdf")},
+            data={"nb_questions": "31"},
+        )
+        assert r.status_code == 422
+    assert post(client).status_code == 200
+    assert post(client).status_code == 200
+    assert post(client).status_code == 429
