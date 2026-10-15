@@ -46,6 +46,11 @@ class ProviderUnavailableError(ApiError):
     code = "provider_unavailable"
 
 
+class ProviderOverloadedError(ApiError):
+    status_code = 503
+    code = "provider_overloaded"
+
+
 class GenerationTimeoutError(ApiError):
     status_code = 504
     code = "generation_timeout"
