@@ -54,7 +54,9 @@ def post(client, headers=HEADERS, content=PDF):
 def test_ok(client):
     r = post(client)
     assert r.status_code == 200
-    assert r.json()["qcm"][0]["indexBonneReponse"] == 1
+    question = r.json()["qcm"][0]
+    assert question["propositions"][question["indexBonneReponse"]] == "TCP"
+    assert sorted(question["propositions"]) == ["ARP", "ICMP", "TCP", "UDP"]
     assert r.json()["avertissement"] is None
 
 
